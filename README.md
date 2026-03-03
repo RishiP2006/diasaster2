@@ -1,62 +1,16 @@
-# DisasterHQ — Disaster Management & Response System
+# React + Vite
 
-A full-stack disaster management platform built with React + TypeScript + Tailwind CSS + Supabase.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
----
+Currently, two official plugins are available:
 
-## ⚡ Quick Start
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-### 1. Seed the Database (required first!)
+## React Compiler
 
-Open your **Supabase project → SQL Editor** and run the contents of:
-```
-supabase/seed.sql
-```
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-This populates all tables: zones, crisis types, authorities, users, sample requests, assignments, and volunteer entries. Without this step the dropdowns (disaster type, zone) will be empty.
+## Expanding the ESLint configuration
 
-### 2. Local Development
-
-```bash
-npm install
-cp .env.example .env      # fill in your Supabase URL + anon key
-npm run dev
-```
-
-### 3. Deploy to Vercel
-
-1. Push this repo to GitHub
-2. Import in [vercel.com](https://vercel.com/new)
-3. Add Environment Variables:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_PUBLISHABLE_KEY`
-4. Deploy — `vercel.json` handles SPA routing automatically.
-
----
-
-## User Roles
-
-| Role | How determined | Dashboard |
-|---|---|---|
-| **Admin** | `User.level >= 5` | All requests, assign responders, force-close |
-| **Responder** (Authority) | From `authority` table | Assigned incidents + all requests view |
-| **Volunteer** | `User.wishtovolunteer = true` | Browse open requests, volunteer/withdraw |
-| **Citizen** | Default `User` | Public feed + submit own reports |
-
----
-
-## Database Tables
-
-`zone` · `crisistype` · `department` · `deptbranch` · `authority` · `User` · `family` · `request` · `authorityassignment` · `userhelp` · `depthandlecrisistype`
-
----
-
-## Scripts
-
-```bash
-npm run dev       # dev server
-npm run build     # production build
-npm run preview   # preview build locally
-npm run lint      # ESLint
-npm run test      # unit tests
-```
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.

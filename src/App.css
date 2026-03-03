@@ -1,42 +1,76 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* src/App.css */
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: #f4f4f9;
+  color: #333;
+  margin: 0;
+  padding: 20px;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.container { max-width: 1000px; margin: 0 auto; }
+h1 { text-align: center; color: #b91c1c; margin-bottom: 30px; }
+
+/* ROLE SWITCHER */
+.role-switcher {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.role-switcher button {
+  padding: 10px 20px;
+  border: 2px solid #b91c1c;
+  background: white;
+  color: #b91c1c;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.role-switcher button.active, .role-switcher button:hover {
+  background: #b91c1c;
+  color: white;
 }
 
-.card {
-  padding: 2em;
-}
+/* LAYOUT */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+.card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+.full-width { width: 100%; box-sizing: border-box; }
 
-.read-the-docs {
-  color: #888;
-}
+/* FORMS */
+.input-group { margin-bottom: 15px; }
+label { display: block; font-weight: bold; margin-bottom: 5px; }
+input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+
+/* BUTTONS */
+.btn { background-color: #b91c1c; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
+.btn:hover { background-color: #991b1b; }
+.btn-small { width: auto; padding: 6px 12px; font-size: 0.9em; margin-top: 10px;}
+.btn-volunteer { background-color: #2563eb; }
+.btn-volunteer:hover { background-color: #1d4ed8; }
+.btn-resolve { background-color: #16a34a; }
+.btn-resolve:hover { background-color: #15803d; }
+
+/* LIST ITEMS */
+.request-item { border-left: 4px solid #b91c1c; padding: 15px; margin-bottom: 15px; background-color: #fef2f2; border-radius: 0 4px 4px 0;}
+.request-item h3 { margin: 0 0 5px 0; display: flex; justify-content: space-between; align-items: center;}
+.authority-item { display: flex; justify-content: space-between; align-items: center;}
+.action-buttons { text-align: right; }
+
+/* BADGES & TEXT */
+.badge { background: #333; color: white; font-size: 0.8em; padding: 4px 8px; border-radius: 12px; }
+.badge-open { background: #eab308; }
+.badge-inprogress { background: #2563eb; }
+.badge-resolved { background: #16a34a; }
+.success-text { color: #16a34a; font-weight: bold; margin-top: 10px;}
+
+/* ADMIN TABLE */
+.admin-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+.admin-table th, .admin-table td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+.admin-table th { background-color: #f8fafc; }
+.assign-action { display: flex; gap: 10px; align-items: center; }
+.assign-action select { width: auto; margin: 0; }
+.assign-action button { margin: 0; }
