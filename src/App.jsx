@@ -1,12 +1,19 @@
 // src/App.jsx
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import AuthScreen from './AuthScreen'
 import './App.css'
 
-// We are simulating that the logged-in user is User #1 (John Connor)
-const CURRENT_USER_ID = 1;
-
 function App() {
+  // Auth State
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('disasterUser')
+    return saved ? JSON.parse(saved) : null
+  })
+  const [isAdmin, setIsAdmin] = useState(() => {
+    return localStorage.getItem('disasterAdmin') === 'true'
+  })
+
   const [role, setRole] = useState('citizen') // 'citizen', 'admin', 'authority'
   
   // Data State
@@ -25,9 +32,35 @@ function App() {
   const [formData, setFormData] = useState({ title: '', description: '', crisistypeid: '', zoneid: '', severity: 5 })
   const [assignData, setAssignData] = useState({}) 
 
+  function handleLogin(user) {
+    setCurrentUser(user)
+    setIsAdmin(false)
+    localStorage.setItem('disasterUser', JSON.stringify(user))
+    localStorage.removeItem('disasterAdmin')
+  }
+
+  function handleAdminLogin() {
+    setCurrentUser({ userid: 0, fname: 'Admin' })
+    setIsAdmin(true)
+    setRole('admin')
+    localStorage.setItem('disasterUser', JSON.stringify({ userid: 0, fname: 'Admin' }))
+    localStorage.setItem('disasterAdmin', 'true')
+  }
+
+  function handleLogout() {
+    setCurrentUser(null)
+    setIsAdmin(false)
+    localStorage.removeItem('disasterUser')
+    localStorage.removeItem('disasterAdmin')
+    setMyFamily(null)
+    setRequests([])
+    setRole('citizen')
+  }
+
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (currentUser) fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser])
 
   async function fetchData() {
     // 1. Fetch main requests
@@ -52,11 +85,11 @@ function App() {
     if (famData) setAvailableFamilies(famData)
 
     // 4. Fetch Current User's Family Status 
-    let { data: userData, error: userErr } = await supabase.from('User').select('familyowner').eq('userid', CURRENT_USER_ID).single()
+    let { data: userData, error: userErr } = await supabase.from('User').select('familyowner').eq('userid', currentUser.userid).single()
     
     // Fallback if Supabase forced it to lowercase behind the scenes
     if (userErr) {
-      const { data: fallbackUser } = await supabase.from('user').select('familyowner').eq('userid', CURRENT_USER_ID).single()
+      const { data: fallbackUser } = await supabase.from('user').select('familyowner').eq('userid', currentUser.userid).single()
       userData = fallbackUser
     }
 
@@ -72,18 +105,18 @@ function App() {
   async function handleCreateFamily(e) {
     e.preventDefault()
     
-    // 1. Upsert into Family table (Overwrites if the primary key already exists)
+    // 1. Upsert into Family table
     const { error: famError } = await supabase.from('family').upsert([{
-      createdby: CURRENT_USER_ID,
+      createdby: currentUser.userid,
       familyname: newFamilyName,
       nummembers: 1,
-      cumulativelevel: 5 // Hardcoded User 1 level for simulation
+      cumulativelevel: currentUser.level || 1
     }])
     
     if (famError) return alert('Error creating family: ' + famError.message)
 
-    // 2. Update User table to link them
-    await supabase.from('User').update({ familyowner: CURRENT_USER_ID }).eq('userid', CURRENT_USER_ID)
+    // 2. Update User table to link them (familyowner points to family creator)
+    await supabase.from('User').update({ familyowner: currentUser.userid }).eq('userid', currentUser.userid)
     
     alert('Family Created!')
     setNewFamilyName('')
@@ -98,11 +131,14 @@ function App() {
     if (!targetFam || targetFam.nummembers >= 6) return alert("Family is full or invalid!")
 
     // 1. Update User to point to the new family creator's ID
-    const { error } = await supabase.from('User').update({ familyowner: parseInt(joinFamilyId) }).eq('userid', CURRENT_USER_ID)
+    const { error } = await supabase.from('User').update({ familyowner: parseInt(joinFamilyId) }).eq('userid', currentUser.userid)
     if (error) return alert('Error joining: ' + error.message)
 
-    // 2. Increment family member count
-    await supabase.from('family').update({ nummembers: targetFam.nummembers + 1 }).eq('createdby', parseInt(joinFamilyId))
+    // 2. Increment family member count and update cumulative level
+    await supabase.from('family').update({
+      nummembers: targetFam.nummembers + 1,
+      cumulativelevel: (targetFam.cumulativelevel || 0) + (currentUser.level || 1)
+    }).eq('createdby', parseInt(joinFamilyId))
     
     alert('Successfully joined family!')
     setJoinFamilyId('')
@@ -110,15 +146,25 @@ function App() {
   }
 
   async function handleLeaveFamily() {
-    // 1. Remove link from user
-    await supabase.from('User').update({ familyowner: null }).eq('userid', CURRENT_USER_ID)
-    
-    // 2. Decrement member count
-    if (myFamily) {
-      await supabase.from('family').update({ nummembers: Math.max(0, myFamily.nummembers - 1) }).eq('createdby', myFamily.createdby)
+    if (!myFamily) return
+
+    const isCreator = myFamily.createdby === currentUser.userid
+
+    if (isCreator) {
+      // Creator disbands: reset ALL members' familyowner first, then delete the family
+      await supabase.from('User').update({ familyowner: null }).eq('familyowner', myFamily.createdby)
+      await supabase.from('family').delete().eq('createdby', myFamily.createdby)
+      alert('Family disbanded. All members have been removed.')
+    } else {
+      // Regular member leaves
+      await supabase.from('User').update({ familyowner: null }).eq('userid', currentUser.userid)
+      await supabase.from('family').update({
+        nummembers: Math.max(1, myFamily.nummembers - 1),
+        cumulativelevel: Math.max(0, (myFamily.cumulativelevel || 0) - (currentUser.level || 1))
+      }).eq('createdby', myFamily.createdby)
+      alert('You left the family.')
     }
-    
-    alert('You left the family.')
+
     fetchData()
   }
 
@@ -128,7 +174,7 @@ function App() {
     const { error } = await supabase.from('request').insert([{
       title: formData.title, description: formData.description,
       crisistypeid: parseInt(formData.crisistypeid), zoneid: parseInt(formData.zoneid),
-      severity: parseInt(formData.severity), createdby: CURRENT_USER_ID, status: 'Open'
+      severity: parseInt(formData.severity), createdby: currentUser.userid, status: 'Open'
     }])
     if (error) alert('Error: ' + error.message)
     else {
@@ -140,7 +186,7 @@ function App() {
 
   async function handleVolunteer(requestId) {
     const { error } = await supabase.from('userhelp').insert([{
-      requestid: requestId, userid: CURRENT_USER_ID, status: 'Active'
+      requestid: requestId, userid: currentUser.userid, status: 'Active'
     }])
     if (error) alert('Error volunteering: ' + error.message)
     else { alert('You are now volunteering for this crisis!'); fetchData() }
@@ -162,35 +208,29 @@ function App() {
     else { alert('Authority Assigned!'); fetchData() }
   }
 
-  // --- AUTHORITY ACTIONS ---
-  async function handleUpdateStatus(requestId, newStatus) {
-    // Update the assignment status
-    await supabase.from('authorityassignment')
-      .update({ status: newStatus === 'Resolved' ? 'Completed' : 'InProgress' })
-      .match({ requestid: requestId, authorityid: 1 }) // Hardcoded Authority 1 (Sarah Connor)
-
-    // Update the main request status
-    const { error } = await supabase.from('request')
-      .update({ status: newStatus })
-      .eq('requestid', requestId)
-
-    if (error) alert('Error updating status: ' + error.message)
-    else { alert('Status Updated!'); fetchData() }
+  if (!currentUser) {
+    return <AuthScreen onLogin={handleLogin} onAdminLogin={handleAdminLogin} />
   }
 
   return (
     <div className="container">
-      <h1>🚨 Disaster Management Center</h1>
+      <header className="app-header">
+        <h1>🚨 Disaster Management Center</h1>
+        <div className="user-info">
+          <span>Welcome, <strong>{currentUser.fname}</strong></span>
+          <button className="btn btn-small btn-logout" onClick={handleLogout}>Logout</button>
+        </div>
+      </header>
       
-      {/* ROLE SWITCHER */}
-      <div className="role-switcher">
-        <button className={role === 'citizen' ? 'active' : ''} onClick={() => setRole('citizen')}>Citizen / Volunteer</button>
-        <button className={role === 'admin' ? 'active' : ''} onClick={() => setRole('admin')}>Dispatcher (Admin)</button>
-        <button className={role === 'authority' ? 'active' : ''} onClick={() => setRole('authority')}>Authority</button>
-      </div>
+      {/* ROLE SWITCHER (Admin only) */}
+      {isAdmin && (
+        <div className="role-switcher">
+          <button className={role === 'admin' ? 'active' : ''} onClick={() => setRole('admin')}>Dispatcher Console</button>
+        </div>
+      )}
 
       <div className="dashboard">
-        
+
         {/* ========================================== */}
         {/* CITIZEN VIEW */}
         {/* ========================================== */}
@@ -205,8 +245,13 @@ function App() {
                   <h3>{myFamily.familyname}</h3>
                   <p><strong>Members:</strong> {myFamily.nummembers} / 6</p>
                   <p><strong>Cumulative Level:</strong> {myFamily.cumulativelevel}</p>
-                  <span className="badge badge-resolved" style={{marginRight: '10px'}}>✅ Active Member</span>
-                  <button className="btn btn-small" style={{backgroundColor: '#6b7280'}} onClick={handleLeaveFamily}>Leave Family</button>
+                  {myFamily.createdby === currentUser.userid
+                    ? <span className="badge badge-open" style={{marginRight: '10px'}}>👑 Creator</span>
+                    : <span className="badge badge-resolved" style={{marginRight: '10px'}}>✅ Member</span>
+                  }
+                  <button className="btn btn-small" style={{backgroundColor: '#6b7280'}} onClick={handleLeaveFamily}>
+                    {myFamily.createdby === currentUser.userid ? 'Disband Family' : 'Leave Family'}
+                  </button>
                 </div>
               ) : (
                 <div>
@@ -279,12 +324,12 @@ function App() {
                   <small><strong>Zone:</strong> {req.zone?.zonename} | <strong>Severity:</strong> {req.severity}</small>
                   
                   {/* Show Volunteer button if they haven't volunteered yet */}
-                  {!req.userhelp?.some(v => v.userid === CURRENT_USER_ID) && req.status !== 'Resolved' && req.status !== 'Closed' && (
+                  {!req.userhelp?.some(v => v.userid === currentUser.userid) && req.status !== 'Resolved' && req.status !== 'Closed' && (
                     <button className="btn btn-small btn-volunteer" onClick={() => handleVolunteer(req.requestid)}>
                       Hand Raise to Volunteer
                     </button>
                   )}
-                  {req.userhelp?.some(v => v.userid === CURRENT_USER_ID) && (
+                  {req.userhelp?.some(v => v.userid === currentUser.userid) && (
                     <p className="success-text">✅ You are volunteering for this.</p>
                   )}
                 </div>
@@ -333,36 +378,6 @@ function App() {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {/* ========================================== */}
-        {/* AUTHORITY VIEW */}
-        {/* ========================================== */}
-        {role === 'authority' && (
-          <div className="card full-width">
-            <h2>My Assigned Operations (Captain Sarah Connor)</h2>
-            {requests.filter(req => req.authorityassignment?.some(a => a.authorityid === 1)).map(req => (
-              <div key={req.requestid} className="request-item authority-item">
-                <div>
-                  <h3>{req.title} <span className="badge">Severity: {req.severity}</span></h3>
-                  <p>{req.description}</p>
-                  <small><strong>Location:</strong> {req.zone?.zonename}</small>
-                </div>
-                <div className="action-buttons">
-                  <p>Current Status: <strong>{req.status}</strong></p>
-                  {req.status === 'InProgress' && (
-                    <button className="btn btn-resolve" onClick={() => handleUpdateStatus(req.requestid, 'Resolved')}>
-                      Mark as Resolved
-                    </button>
-                  )}
-                  {req.status === 'Resolved' && <span className="success-text">Mission Accomplished</span>}
-                </div>
-              </div>
-            ))}
-            {requests.filter(req => req.authorityassignment?.some(a => a.authorityid === 1)).length === 0 && (
-              <p>No operations currently assigned to you.</p>
-            )}
           </div>
         )}
 
